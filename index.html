@@ -38,7 +38,6 @@
   body { background-image: radial-gradient(rgba(208,20,44,.22) 1.2px, transparent 1.6px); background-size: 14px 14px; }
   .panel { background: #fff; border: 3px solid #141414; border-radius: 10px; box-shadow: 6px 6px 0 #141414; }
   .panel-red { box-shadow: 6px 6px 0 #d0142c; }
-  .clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
   .tabular { font-variant-numeric: tabular-nums; }
   h1, h2, h3 { text-wrap: balance; }
   :focus-visible { outline: 3px solid #141414; outline-offset: 2px; border-radius: 6px; }
@@ -602,7 +601,7 @@ function renderNews() {
       col.lang = lang;
       col.append(el('span', 'self-start text-[10px] font-bold tracking-widest bg-bone text-white rounded px-1.5 py-0.5', lang.toUpperCase()),
                  el('h3', 'text-lg font-bold leading-snug' + (t.muted ? ' text-ash font-medium italic' : ''), t.title),
-                 el('p', 'clamp-4 text-sm text-ash leading-relaxed', t.summary));
+                 el('p', 'text-sm text-ash leading-relaxed', t.summary));
       body.append(col);
     }
     const bottom = el('div', 'flex flex-wrap items-start justify-between gap-3');
