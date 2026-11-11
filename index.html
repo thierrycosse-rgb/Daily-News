@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daily News</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          night: '#f7f2e8',   /* fond, papier */
+          coal:  '#ffffff',   /* cartes */
+          steel: '#d8d0c0',   /* filets */
+          ash:   '#57514a',   /* texte secondaire */
+          bone:  '#141414',   /* texte principal, encre */
+          blood: '#d0142c',   /* rouge d'accent */
+          up:    '#0f8a45',
+          down:  '#c81e1e'
+        },
+        fontFamily: {
+          display: ['Bangers', 'Impact', 'sans-serif'],
+          sans: ['Barlow', 'system-ui', 'sans-serif']
+        }
+      }
+    }
+  };
+</script>
+<style>
+  /* Mise en page : en-tête pleine largeur, puis grille 70 / 30. Style comics clair : papier, encre noire, rouge vif, trame de points, ombres pleines. */
+  :root { color-scheme: light; }
+  html, body { background: #f7f2e8; }
+  body { background-image: radial-gradient(rgba(208,20,44,.22) 1.2px, transparent 1.6px); background-size: 14px 14px; }
+  .panel { background: #fff; border: 3px solid #141414; border-radius: 10px; box-shadow: 6px 6px 0 #141414; }
+  .panel-red { box-shadow: 6px 6px 0 #d0142c; }
+  .clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+  .tabular { font-variant-numeric: tabular-nums; }
+  h1, h2, h3 { text-wrap: balance; }
+  :focus-visible { outline: 3px solid #141414; outline-offset: 2px; border-radius: 6px; }
+  details > summary { list-style: none; cursor: pointer; }
+  details > summary::-webkit-details-marker { display: none; }
+  details[open] .chev { transform: rotate(180deg); }
+  @keyframes pulse-soft { 50% { opacity: .45; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .skeleton { animation: pulse-soft 1.4s ease-in-out infinite; }
+  .spinning svg { animation: spin .9s linear infinite; }
+  @media (prefers-reduced-motion: reduce) { .skeleton, .spinning svg { animation: none; } }
+</style>
+</head>
+<body class="font-sans text-bone antialiased min-h-screen">
+<div class="max-w-7xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
+
+  <!-- En-tête -->
+  <header class="panel panel-red p-5 flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
+    <div>
+      <h1 class="inline-block bg-blood text-white font-display text-5xl sm:text-6xl tracking-wider px-5 pt-1 -rotate-2 border-[3px] border-bone shadow-[5px_5px_0_#141414]">DAILY NEWS</h1>
+      <p class="text-sm font-semibold mt-4">Les infos du jour. Sans filtre, sans pincettes, avec café.</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-x-8 gap-y-4">
+      <div>
+        <p id="date" class="text-sm text-ash first-letter:uppercase">&nbsp;</p>
+        <p class="flex items-center gap-2"><i data-lucide="clock" class="w-5 h-5 text-blood"></i><span id="clock" class="tabular text-3xl font-bold leading-tight">--:--:--</span></p>
+      </div>
+      <div class="border-[3px] border-bone rounded-lg px-4 py-3 min-w-[240px] bg-night">
+        <p class="text-xs text-ash flex items-center gap-1.5"><i data-lucide="map-pin" class="w-3.5 h-3.5"></i>Issy-les-Moulineaux (parapluie non fourni)</p>
+        <div class="flex items-center gap-3 mt-1">
+          <span id="w-icon" class="text-blood"></span>
+          <span id="w-temp" class="tabular text-3xl font-bold">--°</span>
+          <span id="w-label" class="text-sm">Chargement</span>
+        </div>
+        <p id="w-detail" class="tabular text-xs text-ash mt-1">&nbsp;</p>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid grid-cols-1 lg:grid-cols-10 gap-6 items-start">
+
+    <!-- Colonne principale (70 %) -->
+    <main class="lg:col-span-7 flex flex-col gap-4 min-w-0">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div id="tabs" role="tablist" aria-label="Catégories d'actualités" class="flex flex-wrap gap-2"></div>
+        <div class="flex items-center gap-3">
+          <span id="status" class="text-xs text-ash"></span>
+          <button id="refresh" type="button" class="inline-flex items-center gap-2 text-sm font-semibold border-[3px] border-bone bg-white text-bone rounded-lg px-3.5 py-1.5 shadow-[3px_3px_0_#141414] hover:bg-blood hover:text-white transition-colors">
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>Actualiser
+          </button>
+        </div>
+      </div>
+      <div id="feed" class="flex flex-col gap-4" aria-live="polite"></div>
+    </main>
+
+    <!-- Barre latérale (30 %) -->
+    <aside class="lg:col-span-3 flex flex-col gap-6 min-w-0">
+      <section class="panel p-5">
+        <h2 class="font-display text-2xl tracking-wide flex items-center gap-2"><i data-lucide="landmark" class="w-5 h-5 text-blood"></i>Indices &amp; Marchés</h2>
+        <p class="text-xs text-ash">Là où l'épargne fait du yoyo.</p>
+        <div id="grp-indices" class="mt-2 flex flex-col divide-y divide-steel"></div>
+      </section>
+      <section class="panel p-5">
+        <h2 class="font-display text-2xl tracking-wide flex items-center gap-2"><i data-lucide="globe" class="w-5 h-5 text-blood"></i>ETF World</h2>
+        <div id="grp-world" class="mt-2 flex flex-col divide-y divide-steel"></div>
+      </section>
+      <section class="panel p-5">
+        <h2 class="font-display text-2xl tracking-wide flex items-center gap-2"><i data-lucide="flag" class="w-5 h-5 text-blood"></i>ETF Europe</h2>
+        <div id="grp-europe" class="mt-2 flex flex-col divide-y divide-steel"></div>
+      </section>
+      <p class="text-xs text-ash -mt-3 px-1">Variation par rapport à la clôture précédente (24 h pour le Bitcoin). Cours Yahoo Finance via des proxys gratuits : « Indisponible » s'affiche quand ils ne répondent pas.</p>
+      <section class="panel panel-red p-5">
+        <h2 class="font-display text-2xl tracking-wide flex items-center gap-2"><i data-lucide="quote" class="w-5 h-5 text-blood"></i>Citations et Faits du jour</h2>
+        <blockquote id="quote" class="text-lg font-medium leading-snug mt-3"></blockquote>
+        <p id="quote-author" class="text-sm text-ash mt-2"></p>
+        <div class="border-t-2 border-steel mt-4 pt-4">
+          <h3 class="text-xs uppercase tracking-[0.14em] text-blood font-bold flex items-center gap-1.5"><i data-lucide="lightbulb" class="w-3.5 h-3.5"></i>Fait du jour</h3>
+          <p id="fact" class="text-sm mt-2 leading-relaxed"></p>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <footer class="text-xs text-ash border-t-2 border-steel pt-4">
+    Sources : flux RSS de Franceinfo, du Monde, de TechCrunch, du Figaro, de Libération et des Echos via rss2json · Rotor magazine (Airbus Helicopters) · traduction Google Translate ou MyMemory · météo Open-Meteo · Bitcoin CoinGecko · indices et ETF Yahoo Finance.
+  </footer>
+</div>
+
+<script>
+/* ================================================================== Configuration */
+const CITY = { lat: 48.824, lon: 2.270 };               // Issy-les-Moulineaux
+const RSS2JSON = 'https://api.rss2json.com/v1/api.json?rss_url=';
+const RSS2JSON_KEY = '';     // clé gratuite rss2json (rss2json.com) : à coller ici pour lever la limitation des appels sans clé
+const CACHE_MIN = 10;        // cache local des flux, en minutes
+const MAX_PER_TAB = 5;
+const FRESH_HOURS = 36;      // on ne retient que les articles récents
+
+const CATEGORIES = {
+  france: { label: 'À la une France', icon: 'newspaper', badge: 'bg-blood text-white' },
+  monde:  { label: 'À la une Monde',  icon: 'globe',     badge: 'bg-white text-blood border-2 border-blood' },
+  tech: { label: 'Tech & IA', icon: 'cpu',         badge: 'bg-bone text-night' },
+  eco:  { label: 'Économie',  icon: 'trending-up', badge: 'bg-steel text-bone border border-ash/40' },
+  rotor:  { label: 'Rotor magazine',  icon: 'fan',       badge: 'bg-blood text-white' }
+};
+
+const FEEDS = [
+  { cat: 'france', source: 'Franceinfo', url: 'https://www.francetvinfo.fr/france.rss' },
+  { cat: 'france', source: 'Le Monde',   url: 'https://www.lemonde.fr/politique/rss_full.xml' },
+  { cat: 'france', source: 'Le Figaro',  url: 'https://www.lefigaro.fr/rss/figaro_actualite-france.xml' },
+  { cat: 'france', source: 'Libération', url: 'https://www.liberation.fr/arc/outboundfeeds/rss/category/politique/?outputType=xml' },
+  { cat: 'france', source: 'Les Echos',  url: 'https://services.lesechos.fr/rss/les-echos-politique.xml' },
+  { cat: 'monde',  source: 'Franceinfo', url: 'https://www.francetvinfo.fr/monde.rss' },
+  { cat: 'monde',  source: 'Le Monde',   url: 'https://www.lemonde.fr/international/rss_full.xml' },
+  { cat: 'monde',  source: 'Le Figaro',  url: 'https://www.lefigaro.fr/rss/figaro_international.xml' },
+  { cat: 'monde',  source: 'Libération', url: 'https://www.liberation.fr/arc/outboundfeeds/rss/category/international/?outputType=xml' },
+  { cat: 'monde',  source: 'Les Echos',  url: 'https://services.lesechos.fr/rss/les-echos-monde.xml' },
+  { cat: 'tech',   source: 'TechCrunch', lang: 'en', url: 'https://techcrunch.com/feed/' },
+  { cat: 'tech',   source: 'Les Echos',  url: 'https://services.lesechos.fr/rss/les-echos-tech-medias.xml' },
+  { cat: 'tech',   source: 'Le Monde',   url: 'https://www.lemonde.fr/pixels/rss_full.xml' },
+  { cat: 'eco',    source: 'Franceinfo', url: 'https://www.francetvinfo.fr/economie.rss' },
+  { cat: 'eco',    source: 'Les Echos',  url: 'https://services.lesechos.fr/rss/les-echos-economie.xml' },
+  { cat: 'eco',    source: 'Le Figaro',  url: 'https://www.lefigaro.fr/rss/figaro_economie.xml' },
+  { cat: 'eco',    source: 'Le Monde',   url: 'https://www.lemonde.fr/economie/rss_full.xml' },
+  { cat: 'eco',    source: 'Libération', url: 'https://www.liberation.fr/arc/outboundfeeds/rss/category/economie/?outputType=xml' }
+];
+
+/* Données de démonstration : sujets fictifs, affichés uniquement quand aucun flux d'un onglet n'a répondu. */
+const D = (cat, source, link, frT, frS, enT, enS) => ({ cat, demo: true, label: 'Exemple fictif', stamp: 'Démonstration',
+  fr: { title: frT, summary: frS }, en: { title: enT, summary: enS }, articles: [{ source, title: 'page d\'accueil', link }] });
+const DEMO = {
+  france: [
+    D('france', 'Franceinfo', 'https://www.francetvinfo.fr/', 'Budget : les débats reprennent à l\'Assemblée nationale', 'Les députés examinent la partie recettes du projet de loi de finances. Plusieurs amendements restent en discussion avant le vote, et les oppositions annoncent des contre-propositions.', 'Budget: debates resume at the National Assembly', 'MPs are examining the revenue side of the finance bill. Several amendments are still under discussion before the vote, and opposition parties are announcing counter-proposals.'),
+    D('france', 'Le Figaro', 'https://www.lefigaro.fr/', 'Transports : un trafic perturbé attendu en fin de semaine', 'Plusieurs lignes régionales devraient circuler au ralenti. Les voyageurs sont invités à vérifier leurs horaires avant de partir.', 'Transport: disruptions expected at the end of the week', 'Several regional lines are expected to run a reduced service. Travellers are advised to check their timetables before leaving.'),
+    D('france', 'Libération', 'https://www.liberation.fr/', 'Éducation : une concertation s\'ouvre sur les rythmes scolaires', 'Enseignants, parents et collectivités sont invités à donner leur avis sur l\'organisation de la semaine. Les conclusions sont attendues au printemps.', 'Education: consultation opens on school timetables', 'Teachers, parents and local authorities are invited to give their views on how the school week is organised. Conclusions are expected in the spring.')
+  ],
+  monde: [
+    D('monde', 'Le Monde', 'https://www.lemonde.fr/international/', 'Climat : ce qu\'il faut attendre de la prochaine conférence internationale', 'Financement de la transition, objectifs de réduction des émissions, adaptation : tour d\'horizon des dossiers sur la table des négociateurs.', 'Climate: what to expect from the next international conference', 'Transition funding, emission reduction targets, adaptation: an overview of the issues on the negotiators\' table.'),
+    D('monde', 'Franceinfo', 'https://www.francetvinfo.fr/monde/', 'Union européenne : un sommet consacré à la défense et à l\'énergie', 'Les dirigeants des États membres se retrouvent pour deux jours de discussions. Les questions de financement commun devraient dominer les échanges.', 'European Union: a summit devoted to defence and energy', 'Leaders of the member states are meeting for two days of talks. Questions of joint funding are expected to dominate the discussions.'),
+    D('monde', 'Les Echos', 'https://www.lesechos.fr/monde', 'Commerce mondial : les négociations douanières reprennent', 'Plusieurs grandes économies rouvrent les discussions sur les droits de douane. Les industriels espèrent davantage de visibilité.', 'World trade: tariff negotiations resume', 'Several major economies are reopening talks on customs duties. Manufacturers are hoping for more visibility.')
+  ],
+  tech: [
+    D('tech', 'TechCrunch', 'https://techcrunch.com/', 'Les assistants IA s\'installent dans les outils de bureautique', 'Éditeurs et startups multiplient les intégrations dans les suites de productivité, avec la question de la fiabilité en toile de fond.', 'AI assistants settle into office tools', 'Publishers and startups are multiplying integrations into productivity suites, with reliability as the underlying question.'),
+    D('tech', 'Les Echos', 'https://www.lesechos.fr/tech-medias', 'Semi-conducteurs : l\'Europe cherche à sécuriser ses approvisionnements', 'Les industriels plaident pour des investissements de long terme afin de réduire la dépendance aux fournisseurs lointains.', 'Semiconductors: Europe seeks to secure its supplies', 'Manufacturers are calling for long-term investment to reduce dependence on distant suppliers.'),
+    D('tech', 'Le Monde', 'https://www.lemonde.fr/pixels/', 'Cybersécurité : les collectivités face aux rançongiciels', 'Mairies et hôpitaux restent des cibles privilégiées. Les experts recommandent des sauvegardes hors ligne et des exercices réguliers.', 'Cybersecurity: local authorities facing ransomware', 'Town halls and hospitals remain prime targets. Experts recommend offline backups and regular drills.')
+  ],
+  eco: [
+    D('eco', 'Les Echos', 'https://www.lesechos.fr/economie-france', 'Inflation : les prix à la consommation sous surveillance', 'Les économistes scrutent l\'énergie et l\'alimentaire, deux postes qui pèsent sur le pouvoir d\'achat des ménages.', 'Inflation: consumer prices under watch', 'Economists are watching energy and food, two items that weigh on household purchasing power.'),
+    D('eco', 'Le Figaro', 'https://www.lefigaro.fr/economie', 'Immobilier : le marché du crédit donne des signes de reprise', 'Les courtiers constatent un retour des emprunteurs, même si les volumes restent inférieurs à ceux des années précédentes.', 'Property: the mortgage market shows signs of recovery', 'Brokers are seeing borrowers return, although volumes remain below those of previous years.'),
+    D('eco', 'Franceinfo', 'https://www.francetvinfo.fr/economie/', 'Aéronautique : les cadences de production restent un défi', 'Les constructeurs font face à des carnets de commandes pleins et à une chaîne de fournisseurs encore sous tension.', 'Aerospace: production rates remain a challenge', 'Manufacturers face full order books and a supplier chain still under strain.')
+  ]
+};
+
+/* Symboles Yahoo Finance. À corriger ici si un ticker ne correspond pas à la part que vous détenez. */
+const MARKET_GROUPS = {
+  'grp-indices': [
+    { name: 'CAC 40',  sub: 'Paris',    symbol: '^FCHI', unit: 'pts' },
+    { name: 'S&P 500', sub: 'New York', symbol: '^GSPC', unit: 'pts' },
+    { name: 'Bitcoin', sub: 'BTC / EUR', coingecko: true, unit: '€', decimals: 0 }
+  ],
+  /* Plus gros ETF actions Monde par encours (source justETF, novembre 2026) */
+  'grp-world': [
+    { name: 'iShares Core MSCI World',  sub: 'IWDA · Amsterdam', symbol: 'IWDA.AS' },
+    { name: 'Vanguard FTSE All-World',  sub: 'VWCE · Xetra',     symbol: 'VWCE.DE' },
+    { name: 'iShares MSCI ACWI',        sub: 'IUSQ · Xetra',     symbol: 'IUSQ.DE' },
+    { name: 'Xtrackers MSCI World',     sub: 'XDWD · Xetra',     symbol: 'XDWD.DE' },
+    { name: 'HSBC MSCI World',          sub: 'H4ZJ · Xetra',     symbol: 'H4ZJ.DE' }
+  ],
+  /* Plus gros ETF actions Europe par encours */
+  'grp-europe': [
+    { name: 'Amundi Core Stoxx Europe 600',   sub: 'MEUD · Paris',     symbol: 'MEUD.PA' },
+    { name: 'iShares STOXX Europe 600 (DE)',  sub: 'EXSA · Xetra',     symbol: 'EXSA.DE' },
+    { name: 'iShares Core MSCI Europe',       sub: 'IMAE · Amsterdam', symbol: 'IMAE.AS' },
+    { name: 'Xtrackers STOXX Europe 600',     sub: 'XSX6 · Xetra',     symbol: 'XSX6.DE' },
+    { name: 'Vanguard FTSE Developed Europe', sub: 'VEUR · Amsterdam', symbol: 'VEUR.AS' }
+  ]
+};
+
+const QUOTES = [
+  ['Ce qui se conçoit bien s\'énonce clairement, et les mots pour le dire arrivent aisément.', 'Nicolas Boileau, L\'Art poétique'],
+  ['Science sans conscience n\'est que ruine de l\'âme.', 'François Rabelais, Pantagruel'],
+  ['Il faut cultiver notre jardin.', 'Voltaire, Candide'],
+  ['Le cœur a ses raisons que la raison ne connaît point.', 'Blaise Pascal, Pensées'],
+  ['À vaincre sans péril, on triomphe sans gloire.', 'Pierre Corneille, Le Cid'],
+  ['Rien ne sert de courir ; il faut partir à point.', 'Jean de La Fontaine, Le Lièvre et la Tortue'],
+  ['La critique est aisée, et l\'art est difficile.', 'Philippe Néricault Destouches, Le Glorieux'],
+  ['Je pense, donc je suis.', 'René Descartes, Discours de la méthode']
+];
+const FACTS = [
+  'Le CAC 40 a été lancé avec une base de 1 000 points au 31 décembre 1987.',
+  'Le premier bloc de Bitcoin, dit bloc genesis, a été miné le 3 janvier 2009.',
+  'ETF signifie Exchange Traded Fund : un fonds coté en Bourse qui réplique un indice.',
+  'L\'ALAT, l\'Aviation légère de l\'armée de Terre, a été créée en 1954. Elle met en œuvre l\'essentiel des hélicoptères militaires français.',
+  'L\'hélicoptère de combat Tigre a effectué son premier vol le 27 avril 1991.',
+  'Le NH90 porte le nom de Caïman dans les armées françaises. Son premier vol date du 18 décembre 1995.',
+  'Le Puma SA 330 a volé pour la première fois le 15 avril 1965.',
+  'Le prototype de la Gazelle, le SA 340, a effectué son premier vol le 7 avril 1967.',
+  'L\'Alouette II, qui a volé en mars 1955, est le premier hélicoptère à turbine produit en série.',
+  'Le H225M Caracal peut être ravitaillé en vol, ce qui lui permet des missions à très longue distance.',
+  'Le H160M Guépard est issu du programme HIL (hélicoptère interarmées léger) et doit équiper les trois armées.',
+  'Le Super Frelon, longtemps le plus lourd des hélicoptères français, a effectué son premier vol le 7 décembre 1962.'
+];
+
+/* ================================================================== Utilitaires */
+const $ = id => document.getElementById(id);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+const icon = (name, cls) => { const i = document.createElement('i'); i.setAttribute('data-lucide', name); i.className = cls || 'w-4 h-4'; return i; };
+const drawIcons = () => { try { window.lucide && lucide.createIcons(); } catch {} };
+const stripHtml = html => (new DOMParser().parseFromString(String(html || ''), 'text/html').body.textContent || '').replace(/\s+/g, ' ').trim();
+const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : null; } catch { return null; } };
+const fmtNum = (n, d = 2) => n.toLocaleString('fr-FR', { minimumFractionDigits: d, maximumFractionDigits: d });
+async function getJson(url, ms = 10000) {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  try { const r = await fetch(url, { signal: ctl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.json(); }
+  finally { clearTimeout(t); }
+}
+function timeLabel(ts) {
+  const d = new Date(ts), diff = Math.round((Date.now() - ts) / 6e4);
+  const hm = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  if (diff < 1) return hm + ' · à l\'instant';
+  if (diff < 60) return hm + ' · il y a ' + diff + ' min';
+  if (diff < 1440) return hm + ' · il y a ' + Math.round(diff / 60) + ' h';
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' · ' + hm;
+}
+
+/* ================================================================== Date et horloge */
+function tick() {
+  const d = new Date();
+  $('date').textContent = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  $('clock').textContent = d.toLocaleTimeString('fr-FR');
+}
+tick(); setInterval(tick, 1000);
+
+/* ================================================================== Météo (Open-Meteo, sans clé) */
+const WMO = { 0: ['Ciel dégagé', 'sun'], 1: ['Peu nuageux', 'cloud-sun'], 2: ['Partiellement nuageux', 'cloud-sun'], 3: ['Couvert', 'cloud'],
+  45: ['Brouillard', 'cloud-fog'], 48: ['Brouillard givrant', 'cloud-fog'], 51: ['Bruine légère', 'cloud-drizzle'], 53: ['Bruine', 'cloud-drizzle'], 55: ['Bruine dense', 'cloud-drizzle'],
+  61: ['Pluie faible', 'cloud-rain'], 63: ['Pluie', 'cloud-rain'], 65: ['Pluie forte', 'cloud-rain'], 66: ['Pluie verglaçante', 'cloud-rain'], 67: ['Pluie verglaçante', 'cloud-rain'],
+  71: ['Neige faible', 'cloud-snow'], 73: ['Neige', 'cloud-snow'], 75: ['Neige forte', 'cloud-snow'], 77: ['Grains de neige', 'cloud-snow'],
+  80: ['Averses', 'cloud-rain'], 81: ['Averses', 'cloud-rain'], 82: ['Averses violentes', 'cloud-rain'], 85: ['Averses de neige', 'cloud-snow'], 86: ['Averses de neige', 'cloud-snow'],
+  95: ['Orage', 'cloud-lightning'], 96: ['Orage avec grêle', 'cloud-lightning'], 99: ['Orage avec grêle', 'cloud-lightning'] };
+async function loadWeather() {
+  try {
+    const j = await getJson(`https://api.open-meteo.com/v1/forecast?latitude=${CITY.lat}&longitude=${CITY.lon}&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=1`);
+    const w = WMO[j.current.weather_code] || ['Conditions variables', 'cloud'];
+    $('w-temp').textContent = Math.round(j.current.temperature_2m) + '°';
+    $('w-label').textContent = w[0];
+    $('w-icon').replaceChildren(icon(w[1], 'w-8 h-8'));
+    $('w-detail').textContent = `Min ${Math.round(j.daily.temperature_2m_min[0])}° · Max ${Math.round(j.daily.temperature_2m_max[0])}° · Vent ${Math.round(j.current.wind_speed_10m)} km/h`;
+  } catch {
+    $('w-temp').textContent = '--°';
+    $('w-label').textContent = 'Météo indisponible';
+    $('w-detail').textContent = 'Vérifiez la connexion puis actualisez.';
+  }
+  drawIcons();
+}
+
+/* ================================================================== Marchés et ETF */
+const CURRENCY = { EUR: '€', USD: '$', GBP: '£', GBp: 'p', CHF: 'CHF' };
+/* Yahoo Finance refuse l'appel direct depuis un navigateur : passage par des proxys publics gratuits, peu fiables. */
+const YAHOO_VIA = [
+  u => getJson('https://api.cors.lol/?url=' + encodeURIComponent(u), 8000),
+  async u => JSON.parse((await getJson('https://api.allorigins.win/get?url=' + encodeURIComponent(u), 12000)).contents)
+];
+async function fetchYahoo(symbol) {
+  const y = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
+  let lastErr;
+  for (const via of YAHOO_VIA) {
+    try {
+      const j = await via(y);
+      const r = j.chart.result[0];
+      const closes = r.indicators.quote[0].close.filter(v => v != null);
+      const value = r.meta.regularMarketPrice ?? closes[closes.length - 1];
+      const prev = closes.length > 1 ? closes[closes.length - 2] : r.meta.chartPreviousClose;
+      if (!(value > 0) || !(prev > 0)) throw new Error('données incomplètes');
+      return { value, change: (value / prev - 1) * 100, currency: r.meta.currency };
+    } catch (e) { lastErr = e; }
+  }
+  throw lastErr;
+}
+async function fetchBtc() {
+  const j = await getJson('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=eur&include_24hr_change=true');
+  return { value: j.bitcoin.eur, change: j.bitcoin.eur_24h_change };
+}
+function marketRow(m, data) {
+  const row = el('div', 'flex items-center justify-between gap-3 py-2.5');
+  const left = el('div', 'min-w-0');
+  left.append(el('p', 'text-sm font-semibold leading-tight', m.name), el('p', 'text-xs text-ash', m.sub));
+  const right = el('div', 'text-right shrink-0');
+  if (!data) {
+    right.append(el('p', 'text-xs text-ash', 'Indisponible'));
+  } else {
+    const up = data.change >= 0, unit = m.unit || CURRENCY[data.currency] || data.currency || '';
+    const pill = el('p', 'tabular text-xs font-bold inline-flex items-center gap-1 rounded px-1.5 py-0.5 mt-0.5 ' + (up ? 'bg-up/15 text-up' : 'bg-down/15 text-down'));
+    pill.append(icon(up ? 'trending-up' : 'trending-down', 'w-3.5 h-3.5'), document.createTextNode((up ? '+' : '') + fmtNum(data.change) + ' %'));
+    right.append(el('p', 'tabular text-sm font-semibold', fmtNum(data.value, m.decimals ?? 2) + ' ' + unit), pill);
+  }
+  row.append(left, right);
+  return row;
+}
+async function loadMarkets() {
+  const jobs = [];
+  for (const [boxId, list] of Object.entries(MARKET_GROUPS)) {
+    const box = $(boxId);
+    if (!box.children.length) list.forEach(() => box.append(el('div', 'skeleton h-10 my-1.5 bg-steel/60 rounded')));
+    list.forEach((m, i) => jobs.push({ box, i, m }));
+  }
+  // Un appel à la fois. Si Yahoo échoue trois fois de suite sans aucun succès, on arrête d'insister.
+  let yahooOk = 0, yahooKo = 0;
+  for (const job of jobs) {
+    let data = null;
+    if (job.m.coingecko) { try { data = await fetchBtc(); } catch {} }
+    else if (yahooOk || yahooKo < 3) {
+      try { data = await fetchYahoo(job.m.symbol); yahooOk++; } catch { yahooKo++; }
+      await sleep(1200);
+    }
+    job.box.children[job.i].replaceWith(marketRow(job.m, data));
+    drawIcons();
+  }
+}
+
+/* ================================================================== Actualités : collecte, regroupement par sujet, synthèse */
+const STOP = new Set(('alors apres aussi autre autres avant avec avoir aura cela celle celui cette ceux chez comme comment contre dans depuis deux donc dont elle elles encore entre etait etre faire fait faut leur leurs mais meme moins nous notre nouveau nouvelle nouvelles nouveaux pour pourquoi plus quand quel quelle quels sans selon sera sont sous sur tous tout toute toutes tres trois vers votre vous face veut peut plusieurs annee annees jour jours ' +
+  'about after again against also been before being between could does from have here into just more most much over said says some than that their them then there these they this those through under very what when where which while will with would your first year years report reports').split(' '));
+const norm = s => String(s).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+const tokens = s => new Set(norm(s).split(/[^a-z0-9]+/).filter(w => w.length > 3 && !STOP.has(w)));
+const overlap = (a, b) => { let n = 0; for (const w of a) if (b.has(w)) n++; return n; };
+
+async function getText(url, ms = 12000) {
+  const ctl = new AbortController(); const t = setTimeout(() => ctl.abort(), ms);
+  try { const r = await fetch(url, { signal: ctl.signal }); if (!r.ok) throw new Error('HTTP ' + r.status); return await r.text(); }
+  finally { clearTimeout(t); }
+}
+async function viaRss2json(f) {
+  const j = await getJson(RSS2JSON + encodeURIComponent(f.url) + (RSS2JSON_KEY ? '&api_key=' + encodeURIComponent(RSS2JSON_KEY) : ''), 8000);
+  if (j.status !== 'ok' || !Array.isArray(j.items)) throw new Error('flux invalide');
+  return j.items.map(it => {
+    const date = Date.parse(String(it.pubDate || '').replace(' ', 'T') + 'Z');
+    return { cat: f.cat, source: f.source, lang: f.lang || 'fr', title: stripHtml(it.title), summary: stripHtml(it.description || it.content),
+             link: safeUrl(it.link), date: isNaN(date) ? Date.now() : date };
+  }).filter(a => a.title && a.link);
+}
+/* Lecture directe du flux RSS (XML), quand rss2json refuse la requête. */
+function parseRss(xml, f) {
+  const doc = new DOMParser().parseFromString(String(xml), 'text/xml');
+  const get = (it, tag) => { const n = it.getElementsByTagName(tag)[0]; return n ? n.textContent : ''; };
+  const out = [...doc.getElementsByTagName('item')].slice(0, 15).map(it => {
+    const date = Date.parse(get(it, 'pubDate'));
+    return { cat: f.cat, source: f.source, lang: f.lang || 'fr', title: stripHtml(get(it, 'title')), summary: stripHtml(get(it, 'description')),
+             link: safeUrl(get(it, 'link').trim()), date: isNaN(date) ? Date.now() : date };
+  }).filter(a => a.title && a.link);
+  if (!out.length) throw new Error('flux vide');
+  return out;
+}
+/* rss2json d'abord. Depuis un fichier ouvert en local, il refuse souvent (erreur 429), d'où deux proxys de secours. */
+async function fetchFeed(f) {
+  const enc = encodeURIComponent(f.url);
+  try { return await viaRss2json(f); } catch {}
+  try { return parseRss(await getText('https://api.cors.lol/?url=' + enc, 10000), f); } catch {}
+  return parseRss((await getJson('https://api.allorigins.win/get?url=' + enc, 15000)).contents, f);
+}
+
+/* Deux articles traitent du même sujet si leurs titres partagent assez de mots significatifs. */
+function sameTopic(a, b) {
+  const n = overlap(a.tok, b.tok);
+  return n >= 2 && n / Math.min(a.tok.size, b.tok.size) >= 0.4;
+}
+function buildStories(list) {
+  let items = list.map(a => ({ ...a, tok: tokens(a.title) })).sort((x, y) => y.date - x.date);
+  const fresh = items.filter(a => Date.now() - a.date < FRESH_HOURS * 36e5);
+  if (fresh.length >= MAX_PER_TAB) items = fresh;
+  const clusters = [];
+  for (const a of items) {
+    const c = clusters.find(c => c.some(b => sameTopic(a, b)));
+    c ? c.push(a) : clusters.push([a]);
+  }
+  const stories = clusters.map(c => {
+    const bySource = new Map();                     // un article par source, le plus récent
+    for (const a of c) if (!bySource.has(a.source)) bySource.set(a.source, a);
+    const arts = [...bySource.values()];
+    return { cat: arts[0].cat, lang: arts[0].lang, title: arts[0].title, date: arts[0].date, articles: arts, summary: mergeSummaries(arts) };
+  });
+  // Priorité aux sujets repris par plusieurs sources, puis variété des sources, puis fraîcheur.
+  const picked = [], used = {};
+  const pool = stories.slice();
+  while (picked.length < MAX_PER_TAB && pool.length) {
+    pool.sort((x, y) => (y.articles.length - x.articles.length) || ((used[x.articles[0].source] || 0) - (used[y.articles[0].source] || 0)) || (y.date - x.date));
+    const s = pool.shift();
+    s.articles.forEach(a => used[a.source] = (used[a.source] || 0) + 1);
+    picked.push(s);
+  }
+  return picked;
+}
+/* Synthèse : phrases tirées des extraits de chaque source, sans doublons, limitée à environ 4 lignes. */
+function mergeSummaries(arts) {
+  const kept = [], keptTok = [];
+  let len = 0;
+  const sentences = arts.map(a => (a.summary || '').split(/(?<=[.!?…])\s+/).filter(s => s.length > 25));
+  for (let round = 0; round < 3 && len < 300; round++) {
+    for (const list of sentences) {
+      const s = list[round];
+      if (!s || len + s.length > 380) continue;
+      const t = tokens(s);
+      if (keptTok.some(k => overlap(t, k) / Math.max(1, Math.min(t.size, k.size)) > 0.6)) continue;
+      kept.push(s); keptTok.push(t); len += s.length;
+    }
+  }
+  return kept.join(' ');
+}
+
+/* Rotor magazine : contenu saisi à la main, la page ne peut pas lire le PDF d'Airbus. À mettre à jour à chaque numéro. */
+const ROTOR_ISSUE = 'Rotor n° 143';
+const ROTOR_LINKS = [
+  { source: 'Rotor magazine (FR)', title: 'page officielle', link: 'https://www.airbus.com/fr/products-services/helicopters/rotor-magazine-fr' },
+  { source: 'Rotor magazine (EN)', title: 'official page', link: 'https://www.airbus.com/en/products-services/helicopters/rotor-magazine' },
+  { source: 'PDF', title: 'Rotor 143 (EN)', link: 'https://mediaassets.airbus.com/pm_38_944_944220-jvu018teiq.pdf' }
+];
+const ROTOR = [
+  { fr: { title: 'Hélicoptères militaires : la prochaine génération se prépare maintenant', summary: 'Dossier principal du numéro. Face à un champ de bataille qui évolue très vite, le magazine explique comment se définissent dès aujourd\'hui les futurs appareils militaires : modernisation des plateformes existantes et coopération entre hélicoptères habités et drones.' },
+    en: { title: 'Military helicopters: the next generation is taking shape now', summary: 'The issue\'s main feature. With the battlefield changing fast, the magazine looks at how future military helicopters are being defined today, from upgrades to existing platforms to teaming between crewed helicopters and drones.' } },
+  { fr: { title: 'Soutien de première ligne en France, en Allemagne et en Espagne', summary: 'Le magazine va à la rencontre des unités spécialisées qui assurent le soutien des forces armées de ces trois pays, au plus près des opérations.' },
+    en: { title: 'Frontline support in France, Germany and Spain', summary: 'The magazine visits the specialised units that keep the armed forces of these three countries supported close to operations.' } },
+  { fr: { title: 'Le H125 fait son cinéma', summary: 'Le H125 a servi à filmer des scènes d\'action pour une très grosse production de cinéma. La présentation du numéro ne cite pas le film.' },
+    en: { title: 'The H125 goes to the movies', summary: 'The H125 was used to film action scenes for a major cinema blockbuster. The issue\'s presentation does not name the film.' } },
+  { fr: { title: 'Le H135 veille sur les lancements de la NASA', summary: 'Le H135 assure la sécurité de chaque lancement de fusée de la NASA.' },
+    en: { title: 'The H135 watches over NASA launches', summary: 'The H135 helps safeguard every NASA rocket launch.' } },
+  { fr: { title: 'Le H145 entraîne les chiens de sauvetage', summary: 'Le H145 est utilisé pour l\'entraînement des chiens de recherche et de sauvetage.' },
+    en: { title: 'The H145 trains rescue dogs', summary: 'The H145 is used to train search-and-rescue dogs.' } }
+].map(r => ({ ...r, cat: 'rotor', stamp: ROTOR_ISSUE, label: 'Airbus Helicopters', articles: ROTOR_LINKS }));
+
+/* Traduction à la volée : Google Translate (accès public non officiel), puis MyMemory en secours. Résultats gardés en cache local. */
+let trCache = {};
+try { trCache = JSON.parse(localStorage.getItem('dn-tr') || '{}'); } catch {}
+async function translate(text, from, to) {
+  if (!text) return '';
+  const key = to + '|' + text;
+  if (trCache[key]) return trCache[key];
+  const q = encodeURIComponent(text.slice(0, 480));
+  let out = null;
+  try { const j = await getJson(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=${from}&tl=${to}&dt=t&q=${q}`); out = j[0].map(x => x[0]).join('').trim(); } catch {}
+  if (!out) { try { const j = await getJson(`https://api.mymemory.translated.net/get?q=${q}&langpair=${from}|${to}`); if (Number(j.responseStatus) === 200) out = stripHtml(j.responseData.translatedText); } catch {} }
+  if (out) {
+    if (Object.keys(trCache).length > 400) trCache = {};
+    trCache[key] = out;
+    try { localStorage.setItem('dn-tr', JSON.stringify(trCache)); } catch {}
+  }
+  return out;
+}
+async function translateTab(cat) {
+  const list = (stories[cat] || []).filter(s => !s.fr && !s.tr && !s.trPending);
+  if (!list.length) return;
+  await Promise.all(list.map(async s => {
+    s.trPending = true;
+    const to = s.lang === 'fr' ? 'en' : 'fr';
+    const [title, summary] = await Promise.all([translate(s.title, s.lang, to), translate(s.summary, s.lang, to)]);
+    s.tr = { title, summary: summary || '', failed: !title };
+    s.trPending = false;
+  }));
+  if (cat === activeTab) renderNews();
+}
+
+let stories = { rotor: ROTOR }, activeTab = 'france', lastMeta = { at: 0, failed: 0 }, loadError = false;
+try { const t = localStorage.getItem('dn-tab'); if (CATEGORIES[t]) activeTab = t; } catch {}
+
+/* Chargement des flux : un par un, avec une pause entre deux, car rss2json renvoie une erreur 429 quand on l'interroge en rafale.
+   Chaque flux est gardé en cache local ; en cas d'échec, on réutilise sa dernière version connue. */
+let feedCache = {}, loading = false;
+try { feedCache = JSON.parse(localStorage.getItem('dn-feeds-v2') || '{}'); } catch {}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function rebuild() {
+  const all = FEEDS.flatMap(f => (feedCache[f.url] && feedCache[f.url].items) || []);
+  const fresh = {};
+  for (const cat of Object.keys(CATEGORIES)) if (cat !== 'rotor') fresh[cat] = buildStories(all.filter(a => a.cat === cat)).map(s => ({ ...s, articles: s.articles.map(({ tok, ...a }) => a) }));
+  stories = { ...fresh, rotor: ROTOR };
+  loadError = !all.length;
+}
+async function loadNews(force) {
+  if (loading) return;
+  loading = true;
+  $('refresh').classList.add('spinning');
+  rebuild(); renderNews();
+  // Les flux de l'onglet affiché passent en premier.
+  const queue = FEEDS.filter(f => f.cat === activeTab).concat(FEEDS.filter(f => f.cat !== activeTab));
+  let failed = 0, fetched = 0;
+  for (const f of queue) {
+    const c = feedCache[f.url];
+    if (!force && c && Date.now() - c.at < CACHE_MIN * 6e4) continue;
+    if (fetched++) await sleep(1200);
+    let items = null;
+    try { items = await fetchFeed(f); } catch {}
+    if (items) feedCache[f.url] = { at: Date.now(), items }; else failed++;
+    rebuild();
+    if (f.cat === activeTab) renderNews();
+  }
+  try { localStorage.setItem('dn-feeds-v2', JSON.stringify(feedCache)); } catch {}
+  const times = FEEDS.map(f => feedCache[f.url] && feedCache[f.url].at).filter(Boolean);
+  lastMeta = { at: times.length ? Math.max(...times) : Date.now(), failed };
+  loading = false;
+  $('refresh').classList.remove('spinning');
+  rebuild(); renderNews();
+}
+function renderTabs() {
+  const box = $('tabs'); box.replaceChildren();
+  for (const [key, c] of Object.entries(CATEGORIES)) {
+    const on = key === activeTab;
+    const b = el('button', 'inline-flex items-center gap-2 text-sm font-semibold rounded-lg px-3.5 py-1.5 border-[3px] transition-colors ' +
+      (on ? 'bg-blood border-bone text-white shadow-[3px_3px_0_#141414]' : 'bg-white border-bone text-bone hover:bg-bone hover:text-white'));
+    b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', on);
+    b.append(icon(c.icon), document.createTextNode(c.label));
+    b.addEventListener('click', () => { activeTab = key; try { localStorage.setItem('dn-tab', key); } catch {} renderTabs(); renderNews(); });
+    box.append(b);
+  }
+  drawIcons();
+}
+function renderSkeleton() {
+  const feed = $('feed'); feed.replaceChildren();
+  for (let i = 0; i < MAX_PER_TAB; i++) {
+    const c = el('div', 'skeleton panel p-5 flex flex-col gap-3');
+    c.append(el('div', 'h-4 w-24 bg-steel rounded'), el('div', 'h-5 w-3/4 bg-steel rounded'), el('div', 'h-3 w-full bg-steel rounded'), el('div', 'h-3 w-5/6 bg-steel rounded'));
+    feed.append(c);
+  }
+  $('status').textContent = 'Chargement des flux';
+}
+function sourceLink(a) {
+  const l = el('a', 'inline-flex items-start gap-1.5 text-sm text-bone hover:text-blood underline decoration-blood decoration-2 underline-offset-4');
+  l.href = a.link; l.target = '_blank'; l.rel = 'noopener noreferrer';
+  l.append(icon('external-link', 'w-3.5 h-3.5 mt-1 shrink-0'), el('span', null, a.source + ' : ' + a.title));
+  return l;
+}
+/* Texte d'un sujet dans une langue : original, traduction, ou message d'attente. */
+function textFor(s, lang) {
+  const fr = lang === 'fr';
+  if (s[lang]) return s[lang];
+  if (s.lang === lang) return { title: s.title, summary: s.summary || (fr ? 'Résumé non fourni par les sources.' : 'No summary provided by the sources.') };
+  if (s.tr && !s.tr.failed) return { title: s.tr.title, summary: s.tr.summary };
+  if (s.tr) return { muted: true, title: fr ? 'Traduction indisponible pour le moment.' : 'Translation unavailable right now.', summary: fr ? 'Le service de traduction boude. Réessayez avec « Actualiser ».' : 'The translation service is sulking. Try "Actualiser" again.' };
+  return { muted: true, title: fr ? 'Traduction en cours…' : 'Translating…', summary: '' };
+}
+function renderNews() {
+  const feed = $('feed'); feed.replaceChildren();
+  const isRotor = activeTab === 'rotor';
+  if (loading && !isRotor && !(stories[activeTab] || []).length) return renderSkeleton();
+  if (isRotor) feed.append(el('p', 'text-sm bg-white border-[3px] border-bone rounded-lg px-4 py-2.5',
+    ROTOR_ISSUE + ', dernier numéro en ligne au 11 novembre 2026. Résumé établi d\'après la présentation officielle du numéro : le sommaire détaillé du PDF n\'a pas pu être lu. Ce contenu est fixe et ne se met pas à jour avec « Actualiser ».'));
+  let list = stories[activeTab] || [];
+  const demo = !isRotor && !list.length;
+  if (demo) {
+    list = DEMO[activeTab] || [];
+    feed.append(el('p', 'text-sm font-semibold bg-blood text-white border-[3px] border-bone rounded-lg px-4 py-2.5 shadow-[4px_4px_0_#141414]',
+      'Mode démonstration : aucun flux de cet onglet n\'a répondu. Les sujets ci-dessous sont fictifs, ce ne sont pas de vraies actualités. Patientez deux ou trois minutes puis « Actualiser ».'));
+  }
+  list.forEach((s, idx) => {
+    const n = s.articles.length;
+    const card = el('article', 'panel p-5 flex flex-col gap-3');
+    const top = el('div', 'flex flex-wrap items-center gap-2');
+    top.append(el('span', 'font-display text-3xl text-blood leading-none mr-1', String(idx + 1)),
+               el('span', 'text-[11px] font-bold uppercase tracking-wider rounded px-2 py-1 ' + CATEGORIES[s.cat].badge, CATEGORIES[s.cat].label),
+               el('span', 'text-xs text-ash font-medium', s.label || (n > 1 ? 'Synthèse de ' + n + ' sources' : s.articles[0].source)));
+    const body = el('div', 'grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4');
+    for (const lang of ['fr', 'en']) {
+      const t = textFor(s, lang);
+      const col = el('div', 'flex flex-col gap-1.5 min-w-0' + (lang === 'en' ? ' md:border-l-[3px] md:border-steel md:pl-6' : ''));
+      col.lang = lang;
+      col.append(el('span', 'self-start text-[10px] font-bold tracking-widest bg-bone text-white rounded px-1.5 py-0.5', lang.toUpperCase()),
+                 el('h3', 'text-lg font-bold leading-snug' + (t.muted ? ' text-ash font-medium italic' : ''), t.title),
+                 el('p', 'clamp-4 text-sm text-ash leading-relaxed', t.summary));
+      body.append(col);
+    }
+    const bottom = el('div', 'flex flex-wrap items-start justify-between gap-3');
+    const time = el('time', 'tabular text-xs text-ash inline-flex items-center gap-1.5 mt-0.5');
+    time.append(icon(s.stamp ? 'book-open' : 'clock', 'w-3.5 h-3.5'), document.createTextNode(s.stamp || timeLabel(s.date)));
+    const det = el('details', 'text-right');
+    const sum = el('summary', 'inline-flex items-center gap-1.5 text-sm font-bold text-blood hover:text-bone');
+    sum.append(document.createTextNode('Lire les sources / Read the sources (' + n + ')'), icon('chevron-down', 'chev w-4 h-4 transition-transform'));
+    const links = el('div', 'flex flex-col items-start gap-1.5 mt-2 text-left');
+    s.articles.forEach(a => links.append(sourceLink(a)));
+    det.append(sum, links);
+    bottom.append(time, det);
+    card.append(top, body, bottom);
+    feed.append(card);
+  });
+  if (isRotor) $('status').textContent = ROTOR_ISSUE;
+  else if (loading) $('status').textContent = 'Chargement des flux, un par un';
+  else {
+    const hm = new Date(lastMeta.at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    $('status').textContent = (demo ? 'Démonstration · ' : '') + 'Mis à jour à ' + hm + (lastMeta.failed ? ' · ' + lastMeta.failed + ' flux en échec sur ' + FEEDS.length : '');
+  }
+  drawIcons();
+  translateTab(activeTab);
+}
+
+/* ================================================================== Citation et fait du jour */
+(function () {
+  const d = new Date(), day = Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5);
+  const q = QUOTES[day % QUOTES.length];
+  $('quote').textContent = '« ' + q[0] + ' »';
+  $('quote-author').textContent = q[1];
+  $('fact').textContent = FACTS[day % FACTS.length];
+})();
+
+/* ================================================================== Démarrage */
+$('refresh').addEventListener('click', () => { loadWeather(); loadNews(true).then(loadMarkets); });
+drawIcons();
+for (const [boxId, list] of Object.entries(MARKET_GROUPS)) list.forEach(() => $(boxId).append(el('div', 'skeleton h-10 my-1.5 bg-steel/60 rounded')));
+renderTabs();
+loadWeather(); loadNews(false).then(loadMarkets);
+setInterval(() => loadNews(true), 15 * 6e4);
+setInterval(() => { loadWeather(); loadMarkets(); }, 10 * 6e4);
+</script>
+</body>
+</html>
