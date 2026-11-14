@@ -108,7 +108,7 @@
         <h2 class="font-display text-2xl tracking-wide flex items-center gap-2"><i data-lucide="flag" class="w-5 h-5 text-blood"></i>ETF Europe</h2>
         <div id="grp-europe" class="mt-2 flex flex-col divide-y divide-steel"></div>
       </section>
-      <p class="text-xs text-ash -mt-3 px-1">Variation par rapport à la clôture précédente (24 h pour le Bitcoin). Cours Yahoo Finance via des proxys gratuits : « Indisponible » s'affiche quand ils ne répondent pas.</p>
+      <p class="text-xs text-ash -mt-3 px-1">Variation par rapport à la clôture précédente (24 h pour le Bitcoin). Cours Yahoo Finance via un proxy gratuit : « Indisponible » s'affiche quand il ne répond pas.</p>
       <section class="panel panel-red p-5">
         <h2 class="font-display text-2xl tracking-wide flex items-center gap-2"><i data-lucide="quote" class="w-5 h-5 text-blood"></i>Citations et Faits du jour</h2>
         <blockquote id="quote" class="text-lg font-medium leading-snug mt-3"></blockquote>
@@ -295,10 +295,10 @@ async function loadWeather() {
 
 /* ================================================================== Marchés et ETF */
 const CURRENCY = { EUR: '€', USD: '$', GBP: '£', GBp: 'p', CHF: 'CHF' };
-/* Yahoo Finance refuse l'appel direct depuis un navigateur : passage par des proxys publics gratuits, peu fiables. */
+/* Yahoo Finance refuse l'appel direct depuis un navigateur : passage par un proxy public gratuit, peu fiable.
+   Pour ajouter un proxy de secours, ajouter une fonction à cette liste. */
 const YAHOO_VIA = [
-  u => getJson('https://api.cors.lol/?url=' + encodeURIComponent(u), 8000),
-  async u => JSON.parse((await getJson('https://api.allorigins.win/get?url=' + encodeURIComponent(u), 12000)).contents)
+  u => getJson('https://api.cors.lol/?url=' + encodeURIComponent(u), 8000)
 ];
 async function fetchYahoo(symbol) {
   const y = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=5d`;
@@ -336,7 +336,13 @@ function marketRow(m, data) {
   row.append(left, right);
   return row;
 }
+let marketsLoading = false;
 async function loadMarkets() {
+  if (marketsLoading) return;
+  marketsLoading = true;
+  try { await runMarkets(); } finally { marketsLoading = false; }
+}
+async function runMarkets() {
   const jobs = [];
   for (const [boxId, list] of Object.entries(MARKET_GROUPS)) {
     const box = $(boxId);
@@ -390,12 +396,10 @@ function parseRss(xml, f) {
   if (!out.length) throw new Error('flux vide');
   return out;
 }
-/* rss2json d'abord. Depuis un fichier ouvert en local, il refuse souvent (erreur 429), d'où deux proxys de secours. */
+/* rss2json d'abord. Depuis un fichier ouvert en local, il refuse souvent (erreur 429), d'où un proxy de secours. */
 async function fetchFeed(f) {
-  const enc = encodeURIComponent(f.url);
   try { return await viaRss2json(f); } catch {}
-  try { return parseRss(await getText('https://api.cors.lol/?url=' + enc, 10000), f); } catch {}
-  return parseRss((await getJson('https://api.allorigins.win/get?url=' + enc, 15000)).contents, f);
+  return parseRss(await getText('https://api.cors.lol/?url=' + encodeURIComponent(f.url), 10000), f);
 }
 
 /* Deux articles traitent du même sujet si leurs titres partagent assez de mots significatifs. */
@@ -637,11 +641,11 @@ function renderNews() {
 })();
 
 /* ================================================================== Démarrage */
-$('refresh').addEventListener('click', () => { loadWeather(); loadNews(true).then(loadMarkets); });
+$('refresh').addEventListener('click', () => { loadWeather(); loadMarkets(); loadNews(true); });
 drawIcons();
 for (const [boxId, list] of Object.entries(MARKET_GROUPS)) list.forEach(() => $(boxId).append(el('div', 'skeleton h-10 my-1.5 bg-steel/60 rounded')));
 renderTabs();
-loadWeather(); loadNews(false).then(loadMarkets);
+loadWeather(); loadMarkets(); loadNews(false);   // marchés et actualités en parallèle
 setInterval(() => loadNews(true), 15 * 6e4);
 setInterval(() => { loadWeather(); loadMarkets(); }, 10 * 6e4);
 </script>
