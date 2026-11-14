@@ -122,7 +122,7 @@
   </div>
 
   <footer class="text-xs text-ash border-t-2 border-steel pt-4">
-    Sources : flux RSS de Franceinfo, du Monde, de TechCrunch, du Figaro, de Libération et des Echos via rss2json · Rotor magazine (Airbus Helicopters) · traduction Google Translate ou MyMemory · météo Open-Meteo · Bitcoin CoinGecko · indices et ETF Yahoo Finance.
+    Sources : flux RSS de Franceinfo, du Monde, de TechCrunch, du Figaro, de Libération et des Echos, lus via le proxy cors.lol (rss2json en secours) · Rotor magazine (Airbus Helicopters) · traduction Google Translate ou MyMemory · météo Open-Meteo · Bitcoin CoinGecko · indices et ETF Yahoo Finance.
   </footer>
 </div>
 
@@ -384,7 +384,7 @@ async function viaRss2json(f) {
              link: safeUrl(it.link), date: isNaN(date) ? Date.now() : date };
   }).filter(a => a.title && a.link);
 }
-/* Lecture directe du flux RSS (XML), quand rss2json refuse la requête. */
+/* Lecture directe du flux RSS (XML) : c'est la version la plus fraîche. */
 function parseRss(xml, f) {
   const doc = new DOMParser().parseFromString(String(xml), 'text/xml');
   const get = (it, tag) => { const n = it.getElementsByTagName(tag)[0]; return n ? n.textContent : ''; };
@@ -396,10 +396,11 @@ function parseRss(xml, f) {
   if (!out.length) throw new Error('flux vide');
   return out;
 }
-/* rss2json d'abord. Depuis un fichier ouvert en local, il refuse souvent (erreur 429), d'où un proxy de secours. */
+/* Lecture directe du flux via le proxy cors.lol d'abord : rss2json garde les flux en cache et sert des articles en retard.
+   rss2json ne sert plus que de secours quand le proxy ne répond pas. */
 async function fetchFeed(f) {
-  try { return await viaRss2json(f); } catch {}
-  return parseRss(await getText('https://api.cors.lol/?url=' + encodeURIComponent(f.url), 10000), f);
+  try { return parseRss(await getText('https://api.cors.lol/?url=' + encodeURIComponent(f.url), 10000), f); } catch {}
+  return await viaRss2json(f);
 }
 
 /* Deux articles traitent du même sujet si leurs titres partagent assez de mots significatifs. */
@@ -504,7 +505,7 @@ async function translateTab(cat) {
 let stories = { rotor: ROTOR }, activeTab = 'france', lastMeta = { at: 0, failed: 0 }, loadError = false;
 try { const t = localStorage.getItem('dn-tab'); if (CATEGORIES[t]) activeTab = t; } catch {}
 
-/* Chargement des flux : un par un, avec une pause entre deux, car rss2json renvoie une erreur 429 quand on l'interroge en rafale.
+/* Chargement des flux : un par un, avec une pause entre deux, pour ménager le proxy et rss2json (erreur 429 en rafale).
    Chaque flux est gardé en cache local ; en cas d'échec, on réutilise sa dernière version connue. */
 let feedCache = {}, loading = false;
 try { feedCache = JSON.parse(localStorage.getItem('dn-feeds-v2') || '{}'); } catch {}
